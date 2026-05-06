@@ -1,0 +1,3 @@
+from datetime import datetime
+def generate_run_id():
+    return datetime.now().strftime("%Y%m%d")
