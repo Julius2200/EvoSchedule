@@ -19,11 +19,11 @@ def repair3(chromosome, fitness_dep, num_timeslots, days=5):
         if level_conflict or lec_conflict or room_conflict:
             pending.append(gene)
         else:
-            repaired.append(gene)
             for dept in departments:
                 assigned_levels.add((dept, level, d, t))
             assigned_lecturers.add((l, d, t))
             occupied_rooms.add((r, d, t))
+            repaired.append(gene)
 
     for gene in pending:
         c, l, r, level, _, _ = gene

@@ -3,9 +3,9 @@ from utils.data_loader import get_day_data
 
 """
 Gene representation for timetable entry:
-course_id
-lecturer_name
-room_name
+id
+name
+name
 day
 period
 department
@@ -17,13 +17,13 @@ def build_timetable(chromosome, courses, lecturers, rooms, periods):
     for gene in chromosome:
         c_indx, l_indx, r_indx, day, timeslot = gene
         current_course = courses[c_indx]
-        c_id = current_course["course_id"]
+        c_id = current_course["id"]
         
         current_lec = lecturers[l_indx]
-        l_id = current_lec["lecturer_name"]
+        l_id = current_lec["name"]
 
         current_room = rooms[r_indx]
-        r_id = current_room["room_name"]
+        r_id = current_room["name"]
         current_day = get_day_data(day)
         period = periods[timeslot]
         depts = current_course["department"]

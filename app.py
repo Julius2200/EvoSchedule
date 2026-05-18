@@ -1,17 +1,34 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
+import json
+import os
 import uuid
 from firebase_admin import credentials, firestore
 from scheduler.ga_run import run_ga
+from scheduler.ga_background import start_ga_job_thread
 from data_mgt.data_loader import get_periods
 from utils.date_generator import generate_run_id
 
 app = Flask(__name__)
 CORS(app)#enable CORS for all routes
 
-#initialize firebase admin SDK
-cred = credentials.Certificate("./key.json")
+# initialize firebase admin SDK from secure env var or local key.json fallback
+firebase_service_account = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+if firebase_service_account:
+    try:
+        service_account_info = json.loads(firebase_service_account)
+        cred = credentials.Certificate(service_account_info)
+    except json.JSONDecodeError as exc:
+        raise ValueError("FIREBASE_SERVICE_ACCOUNT_JSON contains invalid JSON") from exc
+elif os.path.exists("key.json"):
+    cred = credentials.Certificate("key.json")
+else:
+    raise EnvironmentError(
+        "Firebase credentials not found. Set FIREBASE_SERVICE_ACCOUNT_JSON or provide key.json."
+    )
+
 firebase_admin.initialize_app(cred)
 
 #initialize firestore
@@ -27,10 +44,10 @@ def resolve_document_id(collection_name, item):
         raise ValueError(f"Expected dict for {collection_name}, got {type(item).__name__}")
 
     natural_keys = {
-        "courses": ["course_id"],
-        "lecturers": ["lecturer_id"],
-        "rooms": ["room_id"],
-        "departments": ["department_id"]
+        "courses": ["id"],
+        "lecturers": ["id"],
+        "rooms": ["id"],
+        "departments": ["id"]
     }
 
     for key in natural_keys.get(collection_name, []):
@@ -83,7 +100,7 @@ def write_single_document(collection_name, document_name, data):
     doc_ref.set(data)
 
 def normalize_assignment_data(data):
-    """Normalize assignment payloads into a dict mapping course_id to lecturer name."""
+    """Normalize assignment payloads into a dict mapping id to lecturer name."""
     if isinstance(data, dict):
         return data
 
@@ -94,8 +111,8 @@ def normalize_assignment_data(data):
                 merged.update(item)
             return merged
 
-        if all(isinstance(item, dict) and "course_id" in item and "lecturer_name" in item for item in data):
-            return {item["course_id"]: item["lecturer_name"] for item in data}
+        if all(isinstance(item, dict) and "id" in item and "name" in item for item in data):
+            return {item["id"]: item["name"] for item in data}
 
         if all(isinstance(item, (list, tuple)) and len(item) == 2 for item in data):
             return dict(data)
@@ -141,9 +158,17 @@ def save_timetable(timetable):
     for i, entry in enumerate(timetable):
         doc_id = f"{run_id}_{i}"
 
+        # Convert Timetable_entry object to dict if needed
+        if isinstance(entry, dict):
+            entry_dict = entry
+        elif hasattr(entry, "__dict__"):
+            entry_dict = entry.__dict__
+        else:
+            entry_dict = {"data": str(entry)}
+
         doc_ref = db.collection("timetables").document(doc_id)
         batch.set(doc_ref, {
-            **entry,
+            **entry_dict,
             "run_id": run_id
         })
         operation_count += 1
@@ -174,7 +199,7 @@ def load_ga_data():
         "courses": load_collection("courses"),
         "lecturers": load_collection("lecturers"),
         "rooms": load_collection("rooms"),
-        "departments": [dept.get("department_id", dept.get("id")) for dept in departments]
+        "departments": [dept.get("id") for dept in departments]
     }
 
 @app.route('/departments', methods=['GET'])
@@ -288,34 +313,46 @@ def save_levels():
 @app.route('/run_ga', methods=["POST"])
 def run_gen_algo():
     try:
-        import time
-        start = time.perf_counter()
-
-        #Load config
+        # Load config
         assignment, global_settings, levels = load_config()
         ga_data = load_ga_data()
-        #extract
+
         courses = ga_data["courses"]
         lecturers = ga_data["lecturers"]
         rooms = ga_data["rooms"]
         departments = ga_data["departments"]
         adj_assignment = assignment
 
-
-        #Run Ga
-        timetable = run_ga(courses, lecturers, rooms, departments, adj_assignment, global_settings)      #decode timetable
-        
-        #save result
-        run_id = save_timetable(timetable)
-
-        end = time.perf_counter()
+        job_id = start_ga_job_thread(
+            db,
+            courses,
+            lecturers,
+            rooms,
+            departments,
+            adj_assignment,
+            global_settings,
+            save_timetable,
+        )
 
         return jsonify({
-            "message": "GA completed successfully",
-            "run_id": run_id,
-            "duration": round(end - start, 4),
-            "entries": len(timetable)
-        }), 200
+            "message": "GA job started",
+            "job_id": job_id,
+            "status_url": f"/run_ga_status/{job_id}",
+        }), 202
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/run_ga_status/<job_id>', methods=["GET"])
+def get_run_ga_status(job_id):
+    try:
+        job_doc = db.collection("ga_jobs").document(job_id).get()
+        if not job_doc.exists:
+            return jsonify({"error": "Job not found"}), 404
+
+        job_data = job_doc.to_dict()
+        job_data["job_id"] = job_id
+        return jsonify(job_data), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -345,4 +382,11 @@ def admin_login():
     data = request.get_json()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(
+        os.environ.get("PORT", 5000)
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port = port
+    )

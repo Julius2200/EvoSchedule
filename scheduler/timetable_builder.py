@@ -29,9 +29,9 @@ def build_timetable(chromosome, courses, lecturers, departments, rooms, periods)
         room = rooms[r_index]
         day = get_particular_day(d)
         period = periods[time]
-        course_id = course["course_id"]
-        lecturer_name = lecturer["lecturer_name"]
-        room_name = room["room_name"]
+        course_id = course["id"]
+        lecturer_name = lecturer["name"]
+        room_name = room["name"]
         host = course["host_department"]
         dept = course["department"]
         timeslot = (d, time)

@@ -1,12 +1,12 @@
 
 
 def format_data(courses, rooms, lecturers, timeslots):
-    #Map course_id -> index
+    #Map course id -> index
     course_index_map = {
-        c["course_id"]: i for i, c in enumerate(courses)
+        c["id"]: i for i, c in enumerate(courses)
     }
 
-    #format lecturers (convert course_ids -> indexes)
+    #format lecturers (convert ids -> indexes)
     formatted_lecturers = []
     for lec in lecturers:
         formatted_lecturers.append({

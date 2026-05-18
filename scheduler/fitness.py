@@ -68,10 +68,9 @@ def fitness(chromosome, fitness_dep, room_cap_map, lec_workload_map, lec_tod_map
 
         if workload < count:
             s_penalty += 1
-    hard_penalty = h_penalty * 5  # Reduced from 20 to 5 for faster convergence
+    hard_penalty = h_penalty * 10  # Reduced from 20 to 5 for faster convergence
     penalty = hard_penalty + s_penalty
 
-    score = 1/(1 + penalty)
-    fitness = round(score, 4)
+    fitness = 1/(1 + penalty)
 
     return fitness

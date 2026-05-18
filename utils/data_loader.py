@@ -40,10 +40,10 @@ def encode_assignment(assignment, courses, lecturers):
     lecturer_index = {lec["id"]: i for i, lec in enumerate(lecturers)}
 
     result = {}
-    for course_id, lecturer_id in assignment.items():
+    for id, lecturer in assignment.items():
         try:
-            c_index = course_index[course_id]
-            l_index = lecturer_index[lecturer_id]
+            c_index = course_index[id]
+            l_index = lecturer_index[lecturer]
         except KeyError as e:
             raise ValueError (f"Missing ID in data: {e}")
         result[c_index] = l_index

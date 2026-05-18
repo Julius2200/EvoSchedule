@@ -1,0 +1,15 @@
+services:
+  - type: web_service
+    name: evoschedule
+    env: python
+    plan: starter
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --config gunicorn_config.py wsgi:app
+    envVars:
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        value: ""
+    healthCheckPath: /
+    autoDeploy: true
+
+# Add FIREBASE_SERVICE_ACCOUNT_JSON as a secure environment variable in the Render dashboard.

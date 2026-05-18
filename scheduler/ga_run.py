@@ -41,7 +41,7 @@ def normalize_global_settings_level_list(global_settings):
 def run_ga(courses, lecturers, rooms, departments, assignment, global_settings):
     max_chrom = 200  # Increased population size for better exploration
     max_gen = 500
-    stagnation_limit = 50  # Stop if no improvement for 50 generations
+    stagnation_limit = 80  # Stop if no improvement for 50 generations
 
     valid_room = valid_rooms(rooms, courses)
     assignments = encode_input_details(courses, lecturers, assignment, rooms)
@@ -159,4 +159,4 @@ def run_ga(courses, lecturers, rooms, departments, assignment, global_settings):
     #decode chromosome
     decoded_timetable = build_timetable(final_chromosome, courses, lecturers, departments, rooms, periods)
 
-    return decoded_timetable, best_fit
+    return decoded_timetable, final_fitness
