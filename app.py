@@ -14,24 +14,33 @@ from utils.date_generator import generate_run_id
 app = Flask(__name__)
 CORS(app)#enable CORS for all routes
 
-# initialize firebase admin SDK from secure env var or local key.json fallback
-firebase_service_account = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
-if firebase_service_account:
-    try:
-        service_account_info = json.loads(firebase_service_account)
-        cred = credentials.Certificate(service_account_info)
-    except json.JSONDecodeError as exc:
-        raise ValueError("FIREBASE_SERVICE_ACCOUNT_JSON contains invalid JSON") from exc
-elif os.path.exists("key.json"):
-    cred = credentials.Certificate("key.json")
-else:
-    raise EnvironmentError(
-        "Firebase credentials not found. Set FIREBASE_SERVICE_ACCOUNT_JSON or provide key.json."
-    )
+# 1. Pull values from Render's environment
+project_id = os.environ.get('FIREBASE_PROJECT_ID')
+client_email = os.environ.get('FIREBASE_CLIENT_EMAIL')
+private_key_raw = os.environ.get('FIREBASE_PRIVATE_KEY')
+account_type = os.environ.get('FIREBASE_TYPE', 'service_account')
+token_uri = os.environ.get('FIREBASE_TOKEN_URI', 'https://googleapis.com')
 
+if not all([project_id, client_email, private_key_raw]):
+    raise RuntimeError("Missing required Firebase environment variables on Render.")
+
+# 2. Fix the newline formatting safely
+private_key = private_key_raw.replace('\\n', '\n')
+
+# 3. Construct the credentials structure Google expects
+cred_dict = {
+    "type": account_type,
+    "project_id": project_id,
+    "client_email": client_email,
+    "private_key": private_key,
+    "token_uri": token_uri,
+}
+
+# 4. Initialize Firebase Admin SDK
+cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
-#initialize firestore
+# 5. Export your database instance
 db = firestore.client()
 
 #----- data writing function -----
